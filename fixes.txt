@@ -1,0 +1,272 @@
+#ui/components
+import pygame
+
+class UIComponent:
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        #self.active = False
+        self.visible = True
+
+    def draw(self, surface):
+        pass
+
+    def handle_event(self, event):
+        return False
+
+class Button(UIComponent):
+    def __init__(self, x, y, width, height, text, callback):
+        super().__init__(x, y, width, height)
+        self.text = text
+        self.callback = callback
+        self.font = pygame.font.Font(None, 32)
+        self.colors = {
+            'normal': (100, 100, 100),
+            'hover': (150, 150, 150),
+            'text': (255, 255, 255)
+        }
+        self.submenu = None
+
+    def draw(self, surface):
+        if not self.visible:
+            return
+
+        color = self.colors[self.state]
+        pygame.draw.rect(surface, color, self.rect)
+
+        text_surface = self.font.render(self.text, True, self.text_color)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        surface.blit(text_surface, text_rect)
+
+    def is_hovered(self, pos):
+        return self.rect.collidepoint(pos)
+
+    def handle_event(self, event):
+        if not self.visible:
+            return False
+
+        if event.type == pygame.MOUSEMOTION:
+            self.state = 'hover' if self.rect.collidepoint(event.pos) else 'normal'
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1 and self.rect.collidepoint(event.pos):
+                self.callback()
+                return True
+        return False
+
+class InputBox(UIComponent):
+    def __init__(self, x, y, width, height, text=''):
+        super().__init__(x, y, width, height)
+        self.text = text
+        self.font = pygame.font.Font(None, 24)
+
+        self.colors = {
+            'inactive': (100, 100, 100),
+            'active': (150, 150, 150),
+            'text': (255, 255, 255)
+        }
+        self.active = False
+
+    def handle_event(self, event):
+        if not self.visible:
+            return False
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self.active = self.rect.collidepoint(event.pos)
+            return self.active
+
+        if event.type == pygame.KEYDOWN and self.active:
+            if event.key == pygame.K_RETURN:
+                self.active = False
+            elif event.key == pygame.K_BACKSPACE:
+                self.text = self.text[:-1]
+            else:
+                self.text += event.unicode
+            return True
+        return False
+
+    def draw(self, surface):
+        if not self.visible:
+            return
+
+        color = self.colors['active'] if self.active else self.colors['inactive']
+        pygame.draw.rect(surface, color, self.rect)
+
+        text_surface = self.font.render(self.text, True, self.colors['text'])
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        surface.blit(text_surface, text_rect)
+# ui/cad_ui.py
+from .components import Button, InputBox
+from .menus import UIManager, Submenu
+
+class CADUserInterface:
+    def __init__(self, cad_system, display_size):
+        self.cad_system = cad_system
+        self.ui_manager = UIManager(display_size[0], display_size[1])
+        self.setup_extrude_menu()
+
+    def setup_extrude_menu(self):
+        # Crear botón de extrusión
+        self.extrude_button = Button(10, 10, 100, 30, "Extrude", self.toggle_extrude_menu)
+        self.ui_manager.add_component(self.extrude_button)
+
+        # Crear submenu de extrusión
+        self.extrude_submenu = Submenu(10, 50, 200, 100)
+        self.extrude_input = InputBox(20, 70, 180, 30, "")
+        self.extrude_submenu.add_component(self.extrude_input)
+
+        self.extrude_confirm = Button(20, 110, 180, 30, "Confirm", self.perform_extrusion)
+        self.extrude_submenu.add_component(self.extrude_confirm)
+
+    def toggle_extrude_menu(self):
+        if self.extrude_submenu.visible:
+            self.extrude_submenu.visible = False
+            self.ui_manager.active_submenu = None
+        else:
+            self.extrude_submenu.visible = True
+            self.ui_manager.active_submenu = self.extrude_submenu
+
+    def perform_extrusion(self):
+        try:
+            extrude_value = float(self.extrude_input.text)
+            self.cad_system.perform_extrusion(extrude_value)
+        except ValueError:
+            print("Invalid input")
+
+    def handle_event(self, event):
+        return self.ui_manager.handle_event(event)
+
+    def draw(self, screen):
+        self.ui_manager.draw(screen)
+
+#ui/menus
+import pygame
+from .components import UIComponent, Button, InputBox
+# Aquí van las clases Submenu y UIManager
+class Submenu:
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.components = []
+        self.visible = False
+        self.background_color = (80, 80, 80)
+
+    def add_component(self, component):
+        self.components.append(component)
+
+    def draw(self, surface):
+        if not self.visible:
+            return
+
+        pygame.draw.rect(surface, self.background_color, self.rect)
+        for component in self.components:
+            component.draw(surface)
+
+    def handle_event(self, event):
+        if not self.visible:
+            return False
+
+        for component in self.components:
+            if component.handle_event(event):
+                return True
+        return False
+
+class UIManager:
+    def __init__(self, width, height):
+        self.surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        self.components = []
+        self.active_submenu = None
+
+    def add_component(self, component):
+        self.components.append(component)
+
+    def draw(self, screen):
+        self.surface.fill((0, 0, 0, 0))
+        for component in self.components:
+            component.draw(self.surface)
+        if self.active_submenu:
+            self.active_submenu.draw(self.surface)
+        screen.blit(self.surface, (0, 0))
+
+    def handle_event(self, event):
+        if self.active_submenu and self.active_submenu.handle_event(event):
+            return True
+        for component in self.components:
+            if component.handle_event(event):
+                return True
+        return False
+
+# sketch.py
+"""
+Maneja toda la lógica relacionada con el dibujo 2D
+"""
+from OpenGL.GL import *
+from OpenGL.GLU import *
+import numpy as np
+
+class Sketch:
+    def __init__(self):
+        self.points = []
+        self.lines = []
+        self.is_drawing = False
+        self.snap_distance = 0.1
+
+    def add_point(self, point):
+        # Intenta hacer snap a un punto existente
+        for existing_point in self.points:
+            if np.linalg.norm(np.array(existing_point) - np.array(point)) < self.snap_distance:
+                return existing_point
+        self.points.append(point)
+        return point
+
+    def start_line(self, point):
+        self.is_drawing = True
+        snap_point = self.add_point(point)
+        self.current_line_start = snap_point
+
+    def end_line(self, point):
+        if self.is_drawing:
+            self.is_drawing = False
+            snap_point = self.add_point(point)
+            self.lines.append((self.current_line_start, snap_point))
+
+    def draw(self):
+
+        glDisable(GL_DEPTH_TEST)
+        glDisable(GL_LIGHTING)
+
+        # Dibujar puntos
+        glPointSize(5.0)
+        glBegin(GL_POINTS)
+        glColor3f(1, 1, 0)  # Amarillo para los puntos
+        for point in self.points:
+            glVertex3f(*point, 0)
+        glEnd()
+
+        # Dibujar líneas
+        glLineWidth(2.0)
+        glBegin(GL_LINES)
+        glColor3f(0, 1, 0)  # Verde para las líneas
+        for line in self.lines:
+            glVertex3f(*line[0], 0)
+            glVertex3f(*line[1], 0)
+        glEnd()
+
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
+
+
+    def get_geometry(self):
+        """
+        Retorna la geometría actual del sketch para operaciones 3D
+        """
+        return {
+            'points': self.points,
+            'lines': self.lines
+        }
+
+    def clear(self):
+        """
+        Limpia el sketch actual
+        """
+        self.points = []
+        self.lines = []
+        self.is_drawing = False

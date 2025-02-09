@@ -1,0 +1,67 @@
+Situación actual
+1. hace el dibujo(sketch)- pero las lineas no quedan visibles luego de soltar el click
+2.hace la extrusión- pero el dibujo 3d es basura y casi no se entiende
+
+Próximos pasos a seguir:
+1. resolver la linea visible, debe ser una convinvación de los eventos del mouse y el reder(?) o el sketsch( que no sabe dice)
+2.¿como podemos mejorar el resultado de la extrusión?
+    cambiar los colores de tanto el fondo como del objeto para tener mejor contraste
+    ¿como dar un efecto de solidez al objeto 3d? solo es necesario colorear los perfiles o recomienda utilizar otra biblioteca para manejar la generación de objetos 3d?
+
+creo que seria mejor cambiar a opngl:
+OPENGL:
+"""def draw_reference_cube():
+                #glPushMatrix()
+                glTranslatef(0, 0, 0)
+                glScale(0.5, 0.5, 0.5)
+
+                # Cubo con colores por cara
+                glBegin(GL_QUADS)
+                # Frente (rojo)
+                glColor3f(1, 0, 0)
+                glVertex3f(-1, -1, 1)
+                glVertex3f(1, -1, 1)
+                glVertex3f(1, 1, 1)
+                glVertex3f(-1, 1, 1)
+
+                # Atrás (verde)
+                glColor3f(0, 1, 0)
+                glVertex3f(-1, -1, -1)
+                glVertex3f(-1, 1, -1)
+                glVertex3f(1, 1, -1)
+                glVertex3f(1, -1, -1)
+
+                # Arriba (azul)
+                glColor3f(0, 0, 1)
+                glVertex3f(-1, 1, -1)
+                glVertex3f(-1, 1, 1)
+                glVertex3f(1, 1, 1)
+                glVertex3f(1, 1, -1)
+
+                # Abajo (amarillo)
+                glColor3f(1, 1, 0)
+                glVertex3f(-1, -1, -1)
+                glVertex3f(1, -1, -1)
+                glVertex3f(1, -1, 1)
+                glVertex3f(-1, -1, 1)
+
+                # Derecha (magenta)
+                glColor3f(1, 0, 1)
+                glVertex3f(1, -1, -1)
+                glVertex3f(1, 1, -1)
+                glVertex3f(1, 1, 1)
+                glVertex3f(1, -1, 1)
+
+                # Izquierda (cian)
+                glColor3f(0, 1, 1)
+                glVertex3f(-1, -1, -1)
+                glVertex3f(-1, -1, 1)
+                glVertex3f(-1, 1, 1)
+                glVertex3f(-1, 1, -1)
+                glEnd()
+                #glPopMatrix()"""
+
+Problemas luego de la mudularización:
+dados los últimos cambios realizados, ya no dibuja lineas en el modo sketch,
+si acerca y aleja la imagen(una cantidad limitada) pero sigue sin observarse
+todo lo relacionado con la ui.A continuación presento el codigo cad_system:

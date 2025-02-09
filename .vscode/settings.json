@@ -1,0 +1,9 @@
+{
+    "python.pythonPath": "D:/Sherman/Downloads/python.exe",
+    "python.analysis.extraPaths": [
+        "D:/Sherman/Downloads/Lib/site-packages"
+    ],
+    "python.autoComplete.extraPaths": [
+        "D:/Sherman/Downloads/Lib/site-packages"
+    ]
+}

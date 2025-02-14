@@ -52,10 +52,7 @@ class CADSystem:
         self.sketch_zoom = 5.0  # Distancia inicial de la cámara en modo sketch
         self.sketch_zoom_speed = 0.5  # Velocidad del zoom
         self.min_zoom = 2.0  # Zoom mínimo (más cerca)
-        self.max_zoom = 20.0  # Zoom máximo (más lejos)
-
-
-
+        self.max_zoom = 200.0  # Zoom máximo (más lejos)
 
     def setup_opengl(self):
         glEnable(GL_DEPTH_TEST)
@@ -103,11 +100,6 @@ class CADSystem:
                 return (float(intersection[0]), float(intersection[1]))
             return None
 
-            """plane_distance = self.sketch_zoom
-            t = -(near_point[2] - plane_distance) / ray_direction[2]
-            intersection = np.array(near_point) + t * ray_direction
-            return (float(intersection[0]), float(intersection[1]))"""
-
         except Exception as e:
             print(f"Error in screen_to_world: {e}")
             return None
@@ -135,18 +127,6 @@ class CADSystem:
             world_pos = self.screen_to_world(*event.pos)
             if world_pos:
                 self.current_sketch.update_current_line(world_pos)
-        """if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            world_pos = self.screen_to_world(*pygame.mouse.get_pos())
-            if world_pos:
-                self.current_sketch.start_line(world_pos)
-                self.last_world_pos = world_pos
-
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            world_pos = self.screen_to_world(*pygame.mouse.get_pos())
-
-            if world_pos and self.last_world_pos:
-                self.current_sketch.end_line(world_pos)
-                self.last_world_pos = None"""
 
     def handle_keyboard(self):
         keys = pygame.key.get_pressed()
@@ -167,7 +147,6 @@ class CADSystem:
             elif keys[pygame.K_MINUS] or keys[pygame.K_KP_MINUS]:  # Alejar
                 self.sketch_zoom = min(self.max_zoom, self.sketch_zoom + self.sketch_zoom_speed)
                 self.update_sketch_camera()
-
 
         else:
             # Movimiento normal de cámara en modo 3D
@@ -271,20 +250,36 @@ class CADSystem:
 
     def toggle_sketch_mode(self):
         self.sketch_mode = not self.sketch_mode
+
+        # Resetear estado OpenGL
+        glLoadIdentity()
+
         if self.sketch_mode:
+            # Configurar para modo sketch
             pygame.mouse.set_visible(True)
             pygame.event.set_grab(False)
+            glDisable(GL_LIGHTING)
             self.update_sketch_camera()
         else:
+            # Configurar para modo 3D
             pygame.mouse.set_visible(False)
             pygame.event.set_grab(True)
+            glEnable(GL_LIGHTING)
             pygame.mouse.set_pos(self.last_mouse_pos)
+
+        # Resetear la matriz de proyección
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        gluPerspective(45, (self.display[0] / self.display[1]), 0.1, 50.0)
+        glMatrixMode(GL_MODELVIEW)
 
 
     def run(self):
         try:
             running = True
+
             while running:
+
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         running = False
@@ -294,48 +289,64 @@ class CADSystem:
                         elif event.key == pygame.K_TAB:
                             self.toggle_sketch_mode()
 
-                    # Manejar zoom con rueda del mouse
-                    elif event.type == pygame.MOUSEWHEEL:
-                        self.handle_mouse_wheel(event)
+                            # Forzar actualización de la vista después del cambio de modo
+                            if self.sketch_mode:
+                                self.update_sketch_camera()
+                                glMatrixMode(GL_PROJECTION)
+                                glLoadIdentity()
+                                gluPerspective(45, (self.display[0] / self.display[1]), 0.1, 50.0)
+                                glMatrixMode(GL_MODELVIEW)
 
-                    # Manejar eventos UI en modo sketch
+                    # Manejar eventos UI solo en modo sketch
                     if self.sketch_mode:
-                        if self.ui.handle_event(event):
-                            continue
-                        self.handle_sketch_input(event)
+                        if event.type in [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION]:
+                            if self.ui.handle_event(event):
+                                continue
+                            self.handle_sketch_input(event)
 
-                self.handle_keyboard()
-                self.handle_mouse_motion()
+                    # Actualizar estado
+                if not self.sketch_mode:
+                    self.handle_keyboard()
+                    self.handle_mouse_motion()
+                else:
+                    # En modo sketch, solo manejar zoom y movimientos específicos
+                    self.handle_keyboard()
 
                 # Renderizado
                 self.render_scene()
 
+                # Forzar actualización de pantalla
                 pygame.display.flip()
+
+                # Pequeña espera para estabilizar el renderizado
                 pygame.time.wait(10)
+
 
         except Exception as e:
             print(f"Error in run: {e}")
-            print("Cerrando aplicación...")
+            import traceback
+            traceback.print_exc()
         finally:
             pygame.quit()
 
     def render_scene(self):
-        # Limpiar el buffer con un color de fondo adecuado
-        glClearColor(0.2, 0.2, 0.2, 1.0)  # Gris oscuro
+        # Limpiar el buffer
+        glClearColor(0.2, 0.2, 0.2, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        # Update view
-        glLoadIdentity()
-        glRotatef(self.camera_rot[0], 1, 0, 0)
-        glRotatef(self.camera_rot[1], 0, 1, 0)
-        glTranslatef(-self.camera_pos[0], -self.camera_pos[1], -self.camera_pos[2])
-
-        # Draw 3D elements
-        self.draw_sketch_plane()
-        self.current_sketch.draw()
-
-        # Switch to 2D mode for UI
         if self.sketch_mode:
+            # Configuración para modo sketch
+            glLoadIdentity()
+            glTranslatef(0, 0, -self.sketch_zoom)
+
+            # Deshabilitar iluminación para el modo sketch
+            glDisable(GL_LIGHTING)
+
+            # Dibujar elementos del sketch
+            self.draw_sketch_plane()
+            self.current_sketch.draw()
+
+            # Configurar vista 2D para UI
             glMatrixMode(GL_PROJECTION)
             glPushMatrix()
             glLoadIdentity()
@@ -344,53 +355,31 @@ class CADSystem:
             glPushMatrix()
             glLoadIdentity()
 
-            # Clear the UI surface
+            # Dibujar UI
             self.ui_surface.fill((0, 0, 0, 0))
-            # Dibujar el plano de sketch
-            self.draw_sketch_plane()
-            # Dibujar el sketch actual
-            self.current_sketch.draw()
-
-            # Draw UI to separate surface
             self.ui.draw(self.ui_surface)
+            surface_string = pygame.image.tostring(self.ui_surface, 'RGBA')
 
-            # Convert surface to texture and render
-            self.render_ui_texture()
+            glEnable(GL_BLEND)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glDrawPixels(self.display[0], self.display[1], GL_RGBA, GL_UNSIGNED_BYTE, surface_string)
+            glDisable(GL_BLEND)
 
-            # Restore 3D mode
+            # Restaurar vista 3D
             glMatrixMode(GL_PROJECTION)
             glPopMatrix()
             glMatrixMode(GL_MODELVIEW)
             glPopMatrix()
+        else:
+            # Modo 3D normal
+            glLoadIdentity()
+            glRotatef(self.camera_rot[0], 1, 0, 0)
+            glRotatef(self.camera_rot[1], 0, 1, 0)
+            glTranslatef(-self.camera_pos[0], -self.camera_pos[1], -self.camera_pos[2])
 
-    def render_ui_texture(self):
-        # Disable 3D features
-        glDisable(GL_DEPTH_TEST)
-        glDisable(GL_LIGHTING)
-
-        # Create texture from UI surface
-        texture_data = pygame.image.tostring(self.ui_surface, "RGBA", True)
-        texture = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, texture)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self.display[0], self.display[1], 0, GL_RGBA, GL_UNSIGNED_BYTE, texture_data)
-
-        # Draw textured quad
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        glBegin(GL_QUADS)
-        glTexCoord2f(0, 0); glVertex2f(0, 0)
-        glTexCoord2f(1, 0); glVertex2f(self.display[0], 0)
-        glTexCoord2f(1, 1); glVertex2f(self.display[0], self.display[1])
-        glTexCoord2f(0, 1); glVertex2f(0, self.display[1])
-        glEnd()
-
-        # Cleanup
-        glDeleteTextures([texture])
-        glDisable(GL_TEXTURE_2D)
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_LIGHTING)
+            glEnable(GL_LIGHTING)
+            self.draw_sketch_plane()
+            self.current_sketch.draw()
 
 
     def perform_extrusion(self, height):
